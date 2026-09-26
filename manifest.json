@@ -1,0 +1,15 @@
+{
+  "name": "Load Control",
+  "short_name": "LoadControl",
+  "description": "Smartphone control and energy monitoring for ESP32-connected AC electrical loads.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0F10",
+  "theme_color": "#0B0F10",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

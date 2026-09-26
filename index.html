@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0F10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Load Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F10; --panel:#131A1C; --panel2:#0F1517; --line:#212B2D;
+    --copper:#D98A4A; --copper-dim:#6B4527;
+    --on:#5FD9A0; --off:#4A5456;
+    --text:#EDEFEA; --muted:#7C8886;
+    --mono:'JetBrains Mono', Consolas, monospace;
+    --display:'Space Grotesk', -apple-system, sans-serif;
+    padding-top: env(safe-area-inset-top,0px);
+    padding-bottom: env(safe-area-inset-bottom,0px);
+    box-sizing: border-box;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; color:var(--text); font-family:var(--display); -webkit-font-smoothing:antialiased;
+    background-color:var(--bg);
+    background-image:
+      linear-gradient(rgba(217,138,74,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(217,138,74,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .wrap{max-width:480px; margin:0 auto; padding:22px 18px 40px;}
+
+  header{display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;}
+  header h1{font-size:1.05rem; font-weight:600; margin:0; letter-spacing:0.3px;}
+  header h1 span{color:var(--copper);}
+  .conn{font-family:var(--mono); font-size:0.68rem; color:var(--on); display:flex; align-items:center; gap:5px;}
+  .dot{width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 6px currentColor;}
+
+  /* --- hero gauge --- */
+  .gauge-wrap{
+    position:relative; background:radial-gradient(circle at 50% 30%, var(--panel), var(--panel2));
+    border:1px solid var(--line); border-radius:20px; padding:26px 20px 20px;
+    display:flex; flex-direction:column; align-items:center; margin-bottom:20px;
+  }
+  .gauge-wrap svg{width:220px; height:130px; overflow:visible;}
+  .needle{transform-origin:110px 110px; transition:transform 0.9s cubic-bezier(.34,1.4,.4,1);}
+  #gaugeFill{transition:stroke-dashoffset 0.9s cubic-bezier(.34,1.4,.4,1);}
+  .gauge-figure{position:relative; display:flex; flex-direction:column; align-items:center;}
+  .gauge-num{
+    position:absolute; top:76px; left:0; right:0; text-align:center;
+    font-family:var(--mono); font-size:1.9rem; font-weight:500; color:var(--copper);
+  }
+  .gauge-unit{
+    position:absolute; top:112px; left:0; right:0; text-align:center;
+    font-size:0.65rem; color:var(--muted); letter-spacing:1px;
+  }
+  .gauge-sub{
+    display:flex; gap:22px; margin-top:6px; font-family:var(--mono); font-size:0.7rem; color:var(--muted);
+  }
+  .gauge-sub b{color:var(--text); font-weight:500;}
+
+  /* --- load rows --- */
+  .section-lbl{font-size:0.72rem; color:var(--muted); margin:6px 2px 10px; letter-spacing:0.3px;}
+  .load-card{
+    position:relative; background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:16px 16px 14px; margin-bottom:12px; overflow:hidden;
+  }
+  .load-card.active{border-color:var(--copper-dim);}
+  .flow-line{
+    position:absolute; left:16px; right:16px; top:0; height:2px;
+    background:repeating-linear-gradient(90deg, var(--copper) 0 6px, transparent 6px 12px);
+    background-size:200% 100%; opacity:0; transition:opacity 0.4s;
+  }
+  .load-card.active .flow-line{opacity:1; animation:flow 1.1s linear infinite;}
+  @keyframes flow{ to{ background-position:-24px 0; } }
+
+  .load-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+  .load-name{font-size:1rem; font-weight:600;}
+  .load-sub{font-size:0.7rem; color:var(--muted); margin-top:1px; font-family:var(--mono);}
+
+  .rocker{
+    width:52px; height:30px; border-radius:8px; background:var(--off); border:1px solid var(--line);
+    position:relative; cursor:pointer; flex-shrink:0;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.4);
+  }
+  .rocker::after{
+    content:'OFF'; position:absolute; inset:2px; border-radius:6px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:0.55rem; letter-spacing:0.5px; color:var(--muted);
+    background:linear-gradient(180deg, #232D2F, #1A2224);
+    transition:all 0.2s;
+  }
+  .rocker.on{background:var(--copper-dim);}
+  .rocker.on::after{content:'ON'; color:#0B0F10; background:linear-gradient(180deg, var(--on), #46B885); font-weight:500;}
+
+  .readout{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+    font-family:var(--mono); border-top:1px solid var(--line); padding-top:12px;
+  }
+  .readout .r-val{font-size:0.98rem; color:var(--text);}
+  .readout .r-val.dim{color:var(--muted); opacity:0.5;}
+  .readout .r-lbl{font-size:0.62rem; color:var(--muted); margin-top:2px;}
+
+  .log-title{font-size:0.72rem; color:var(--muted); margin:22px 2px 8px; letter-spacing:0.3px;}
+  .log{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px; font-family:var(--mono); font-size:0.7rem; color:var(--muted);
+    max-height:110px; overflow-y:auto;
+  }
+  .log div{padding:2px 0; border-bottom:1px dashed rgba(255,255,255,0.04);}
+  .log div:last-child{border-bottom:none;}
+
+  .note{
+    margin-top:20px; font-size:0.68rem; color:var(--muted); line-height:1.55;
+    border-left:2px solid var(--copper-dim); padding-left:10px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Load<span>·</span>Control</h1>
+    <div class="conn"><span class="dot"></span>simulated link</div>
+  </header>
+
+  <div class="gauge-wrap">
+    <div class="gauge-figure">
+      <svg viewBox="0 0 220 130">
+        <path d="M 10 110 A 100 100 0 0 1 210 110" fill="none" stroke="#212B2D" stroke-width="10" stroke-linecap="round"/>
+        <path id="gaugeFill" d="M 10 110 A 100 100 0 0 1 210 110" fill="none" stroke="#D98A4A" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="314" stroke-dashoffset="314"/>
+        <line class="needle" id="needle" x1="110" y1="110" x2="110" y2="28" stroke="#EDEFEA" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="110" cy="110" r="6" fill="#EDEFEA"/>
+      </svg>
+      <div class="gauge-num" id="totalPower">0</div>
+      <div class="gauge-unit">WATTS DRAWN</div>
+    </div>
+    <div class="gauge-sub">
+      <span><b id="loadsOn">0/2</b> loads on</span>
+      <span><b id="uptime">00:00</b> session</span>
+    </div>
+  </div>
+
+  <div class="section-lbl">Channels</div>
+
+  <div class="load-card" data-load="lamp">
+    <div class="flow-line"></div>
+    <div class="load-top">
+      <div>
+        <div class="load-name">Lamp</div>
+        <div class="load-sub">RELAY CH.1</div>
+      </div>
+      <button class="rocker" data-target="lamp"></button>
+    </div>
+    <div class="readout">
+      <div><div class="r-val dim" data-field="voltage">0.0 V</div><div class="r-lbl">voltage</div></div>
+      <div><div class="r-val dim" data-field="current">0.00 A</div><div class="r-lbl">current</div></div>
+      <div><div class="r-val dim" data-field="power">0 W</div><div class="r-lbl">power</div></div>
+    </div>
+  </div>
+
+  <div class="load-card" data-load="fan">
+    <div class="flow-line"></div>
+    <div class="load-top">
+      <div>
+        <div class="load-name">Fan</div>
+        <div class="load-sub">RELAY CH.2</div>
+      </div>
+      <button class="rocker" data-target="fan"></button>
+    </div>
+    <div class="readout">
+      <div><div class="r-val dim" data-field="voltage">0.0 V</div><div class="r-lbl">voltage</div></div>
+      <div><div class="r-val dim" data-field="current">0.00 A</div><div class="r-lbl">current</div></div>
+      <div><div class="r-val dim" data-field="power">0 W</div><div class="r-lbl">power</div></div>
+    </div>
+  </div>
+
+  <div class="log-title">Event log</div>
+  <div class="log" id="log"></div>
+
+  <div class="note">
+    Readings are simulated — no ESP32 connected yet. Voltage/current mimic ZMPT101B + ACS712/SCT-013 sensor behaviour at 230V mains, with mild jitter, so the UI and control flow can be tested ahead of hardware.
+  </div>
+</div>
+
+<script>
+const state = {
+  lamp: { on:false, rated:60 },
+  fan:  { on:false, rated:75 }
+};
+const MAX_POWER = 150;
+const startTime = Date.now();
+const logEl = document.getElementById('log');
+const needle = document.getElementById('needle');
+const gaugeFill = document.getElementById('gaugeFill');
+
+function log(msg){
+  const t = new Date().toLocaleTimeString('en-GB',{hour12:false});
+  const line = document.createElement('div');
+  line.textContent = `[${t}] ${msg}`;
+  logEl.prepend(line);
+  while(logEl.children.length > 20) logEl.removeChild(logEl.lastChild);
+}
+
+function jitter(base, pct){
+  return base + (Math.random()*2-1)*base*pct;
+}
+
+function render(){
+  let totalPower = 0, onCount = 0;
+  document.querySelectorAll('.load-card').forEach(card=>{
+    const key = card.dataset.load;
+    const s = state[key];
+    const sw = card.querySelector('.rocker');
+    sw.classList.toggle('on', s.on);
+    card.classList.toggle('active', s.on);
+
+    const vEl = card.querySelector('[data-field="voltage"]');
+    const cEl = card.querySelector('[data-field="current"]');
+    const pEl = card.querySelector('[data-field="power"]');
+
+    if(s.on){
+      const voltage = jitter(230, 0.01);
+      const power = jitter(s.rated, 0.06);
+      const current = power / voltage;
+      vEl.textContent = voltage.toFixed(1)+' V';
+      cEl.textContent = current.toFixed(2)+' A';
+      pEl.textContent = Math.round(power)+' W';
+      [vEl,cEl,pEl].forEach(e=>e.classList.remove('dim'));
+      totalPower += power;
+      onCount++;
+    } else {
+      vEl.textContent = '0.0 V';
+      cEl.textContent = '0.00 A';
+      pEl.textContent = '0 W';
+      [vEl,cEl,pEl].forEach(e=>e.classList.add('dim'));
+    }
+  });
+  document.getElementById('totalPower').textContent = Math.round(totalPower);
+  document.getElementById('loadsOn').textContent = onCount+'/2';
+
+  const frac = Math.min(totalPower / MAX_POWER, 1);
+  const angle = -90 + frac*180;
+  needle.style.transform = `rotate(${angle}deg)`;
+  const circumference = 314;
+  gaugeFill.style.strokeDashoffset = circumference - frac*circumference;
+
+  const secs = Math.floor((Date.now()-startTime)/1000);
+  const mm = String(Math.floor(secs/60)).padStart(2,'0');
+  const ss = String(secs%60).padStart(2,'0');
+  document.getElementById('uptime').textContent = `${mm}:${ss}`;
+}
+
+document.querySelectorAll('.rocker').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const key = btn.dataset.target;
+    state[key].on = !state[key].on;
+    log(`${key} switched ${state[key].on ? 'ON' : 'OFF'}`);
+    render();
+  });
+});
+
+log('simulated ESP32 link established');
+render();
+setInterval(render, 1200);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed:', err));
+}
+
+</script>
+</body>
+</html>
