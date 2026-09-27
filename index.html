@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0F10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Load Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0B0F10; --panel:#131A1C; --panel2:#0F1517; --line:#212B2D;
+    --copper:#D98A4A; --copper-dim:#6B4527;
+    --on:#5FD9A0; --off:#4A5456;
+    --text:#EDEFEA; --muted:#7C8886;
+    --mono:'JetBrains Mono', Consolas, monospace;
+    --display:'Space Grotesk', -apple-system, sans-serif;
+    padding-top: env(safe-area-inset-top,0px);
+    padding-bottom: env(safe-area-inset-bottom,0px);
+    box-sizing: border-box;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; color:var(--text); font-family:var(--display); -webkit-font-smoothing:antialiased;
+    background-color:var(--bg);
+    background-image:
+      linear-gradient(rgba(217,138,74,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(217,138,74,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .wrap{max-width:480px; margin:0 auto; padding:10px 18px 40px;}
+
+  header{display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;}
+  header h1{font-size:1.05rem; font-weight:600; margin:0; letter-spacing:0.3px;}
+  header h1 span{color:var(--copper);}
+  .hdr-right{display:flex; align-items:center; gap:12px;}
+  .hdr-left{display:flex; align-items:center; gap:10px;}
+  .conn{font-family:var(--mono); font-size:0.68rem; color:var(--on); display:flex; align-items:center; gap:5px;}
+  .dot{width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 6px currentColor;}
+  .gear{
+    width:30px; height:30px; border-radius:8px; background:var(--panel); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); flex-shrink:0;
+  }
+  .gear svg{width:16px; height:16px;}
+
+  .menu-list{padding:6px 0;}
+  .menu-item{
+    display:flex; align-items:center; gap:12px; width:100%; background:none; border:none;
+    color:var(--text); font-family:var(--display); font-size:0.92rem; padding:14px 4px;
+    text-align:left; cursor:pointer; border-bottom:1px solid var(--line);
+  }
+  .menu-item:last-child{border-bottom:none;}
+  .menu-item svg{width:18px; height:18px; color:var(--copper); flex-shrink:0;}
+  .menu-item span.sub{display:block; font-size:0.68rem; color:var(--muted); margin-top:2px; font-family:var(--display);}
+  .account-status{font-family:var(--mono); font-size:0.68rem; color:var(--on); margin-bottom:10px;}
+
+  .menu-header{display:flex; align-items:center; gap:12px; padding-bottom:16px; margin-bottom:6px; border-bottom:1px solid var(--line);}
+  .menu-logo{
+    width:38px; height:38px; border-radius:10px; background:var(--copper-dim);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .menu-logo svg{width:20px; height:20px; color:var(--copper);}
+  .menu-header-text .name{font-weight:600; font-size:0.98rem;}
+  .menu-header-text .tagline{font-size:0.68rem; color:var(--muted); margin-top:1px;}
+
+  .menu-section-lbl{font-size:0.65rem; color:var(--muted); letter-spacing:0.6px; padding:12px 4px 4px;}
+  .menu-item.danger{color:#E08A6B;}
+  .menu-item.danger svg{color:#E08A6B;}
+
+  .menu-footer{text-align:center; font-family:var(--mono); font-size:0.62rem; color:var(--muted); padding-top:10px; margin-top:4px; border-top:1px solid var(--line);}
+
+  .gauge-wrap{
+    position:relative; background:radial-gradient(circle at 50% 30%, var(--panel), var(--panel2));
+    border:1px solid var(--line); border-radius:20px; padding:26px 20px 20px;
+    display:flex; flex-direction:column; align-items:center; margin-bottom:16px;
+  }
+  .gauge-wrap svg.dial{width:220px; height:130px; overflow:visible;}
+  .needle{transform-origin:110px 110px; transition:transform 0.9s cubic-bezier(.34,1.4,.4,1);}
+  #gaugeFill{transition:stroke-dashoffset 0.9s cubic-bezier(.34,1.4,.4,1);}
+  .gauge-figure{position:relative; display:flex; flex-direction:column; align-items:center;}
+  .gauge-num{
+    position:absolute; top:76px; left:0; right:0; text-align:center;
+    font-family:var(--mono); font-size:1.9rem; font-weight:500; color:var(--copper);
+  }
+  .gauge-unit{
+    position:absolute; top:112px; left:0; right:0; text-align:center;
+    font-size:0.65rem; color:var(--muted); letter-spacing:1px;
+  }
+  .gauge-sub{
+    display:flex; gap:22px; margin-top:6px; font-family:var(--mono); font-size:0.7rem; color:var(--muted);
+  }
+  .gauge-sub b{color:var(--text); font-weight:500;}
+
+  .history-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; margin-bottom:20px;
+  }
+  .history-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .history-top span{font-size:0.68rem; color:var(--muted); letter-spacing:0.3px;}
+  .history-card svg{width:100%; height:44px; display:block;}
+
+  .cumulative-btn{
+    width:100%; display:flex; align-items:center; gap:12px;
+    background:linear-gradient(135deg, #1A1410, #131A1C 60%);
+    border:1px solid var(--copper-dim); border-radius:14px;
+    padding:14px 16px; margin-bottom:18px; cursor:pointer; text-align:left;
+    box-shadow:0 0 22px rgba(217,138,74,0.12), inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .cumulative-icon{
+    width:38px; height:38px; border-radius:10px; flex-shrink:0;
+    background:radial-gradient(circle at 30% 30%, #F0A15C, #C97C3D 70%);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 14px rgba(217,138,74,0.5);
+  }
+  .cumulative-icon svg{width:19px; height:19px; color:#1A1410;}
+  .cumulative-text{flex:1; min-width:0;}
+  .cumulative-label{font-size:0.6rem; color:var(--muted); letter-spacing:0.8px;}
+  .cumulative-val{font-family:var(--mono); font-size:1.15rem; font-weight:600; color:var(--copper); margin-top:2px;}
+  .cumulative-chevron{color:var(--muted); font-size:1.3rem; flex-shrink:0;}
+
+  .usage-card, .token-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; margin-bottom:16px;
+  }
+  .usage-top, .token-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;}
+  .usage-top span, .token-top span{font-size:0.66rem; color:var(--muted); letter-spacing:0.5px;}
+  .usage-tabs{display:flex; gap:6px; margin-bottom:12px;}
+  .usage-tabs button{
+    flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    color:var(--muted); font-family:var(--mono); font-size:0.68rem; padding:7px 0; cursor:pointer;
+  }
+  .usage-tabs button.active{color:var(--copper); border-color:var(--copper-dim); background:rgba(217,138,74,0.08);}
+  .usage-controls{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
+  .usage-controls input[type="date"]{
+    flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    padding:8px 10px; color:var(--text); font-family:var(--mono); font-size:0.72rem;
+  }
+  .usage-controls span{font-size:0.68rem; color:var(--muted);}
+  .usage-result{text-align:center;}
+  .usage-val{font-family:var(--mono); font-size:1.3rem; font-weight:600; color:var(--copper);}
+  .usage-sub{font-size:0.65rem; color:var(--muted); margin-top:2px;}
+
+  .token-meter{font-family:var(--mono); font-size:0.68rem; color:var(--muted);}
+  .token-val{font-family:var(--mono); font-size:1.4rem; font-weight:600; color:var(--copper); text-align:center; margin:4px 0;}
+  .token-val.low{color:#E05C5C;}
+  .token-last{text-align:center; font-size:0.62rem; color:var(--muted); font-family:var(--mono); margin-bottom:10px; word-break:break-all;}
+
+  .section-lbl{font-size:0.72rem; color:var(--muted); margin:6px 2px 10px; letter-spacing:0.3px; display:flex; justify-content:space-between; align-items:center;}
+  .master-toggle{
+    background:var(--panel); border:1px solid rgba(224,92,92,0.35); border-radius:8px;
+    color:#E05C5C; font-family:var(--mono); font-size:0.65rem; padding:5px 10px; cursor:pointer;
+    transition:color 0.25s, border-color 0.25s;
+  }
+  .master-toggle.state-on{color:var(--on); border-color:var(--copper-dim);}
+
+  .add-row{display:flex; gap:8px; margin-bottom:14px;}
+  .add-row input{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:11px 12px; color:var(--text); font-family:var(--display); font-size:0.88rem;
+  }
+  .add-row input::placeholder{color:var(--muted);}
+  .add-row button{
+    background:var(--copper-dim); border:none; border-radius:10px; padding:0 16px;
+    color:var(--text); font-family:var(--display); font-weight:600; font-size:0.85rem; cursor:pointer;
+  }
+
+  .load-card{
+    position:relative; background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:16px 16px 14px; margin-bottom:12px; overflow:hidden;
+  }
+  .load-card.active{border-color:var(--copper-dim);}
+  .flow-line{
+    position:absolute; left:16px; right:16px; top:0; height:2px;
+    background:repeating-linear-gradient(90deg, var(--copper) 0 6px, transparent 6px 12px);
+    background-size:200% 100%; opacity:0; transition:opacity 0.4s;
+  }
+  .load-card.active .flow-line{opacity:1; animation:flow 1.1s linear infinite;}
+  @keyframes flow{ to{ background-position:-24px 0; } }
+
+  .load-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px;}
+  .load-name-row{display:flex; align-items:center; gap:10px; min-width:0;}
+  .status-dot{
+    width:14px; height:14px; border-radius:50%; flex-shrink:0;
+    background:#E05C5C; box-shadow:0 0 6px rgba(224,92,92,0.6);
+    transition:background 0.3s, box-shadow 0.3s;
+  }
+  .status-dot.on{background:#34C759; box-shadow:0 0 9px rgba(52,199,89,0.85);}
+  .load-name{font-size:1rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .remove-btn{background:none; border:none; color:var(--muted); font-size:0.9rem; cursor:pointer; padding:2px 4px; flex-shrink:0;}
+  .load-sub{font-size:0.7rem; color:var(--muted); margin-top:1px; font-family:var(--mono);}
+
+  .rocker{
+    width:52px; height:30px; border-radius:8px; background:var(--off); border:1px solid var(--line);
+    position:relative; cursor:pointer; flex-shrink:0;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.4);
+  }
+  .rocker::after{
+    content:'OFF'; position:absolute; inset:2px; border-radius:6px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:0.55rem; letter-spacing:0.5px; color:var(--muted);
+    background:linear-gradient(180deg, #232D2F, #1A2224);
+    transition:all 0.2s;
+  }
+  .rocker.on{background:var(--copper-dim);}
+  .rocker.on::after{content:'ON'; color:#0B0F10; background:linear-gradient(180deg, var(--on), #46B885); font-weight:500;}
+
+  .readout{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+    font-family:var(--mono); border-top:1px solid var(--line); padding-top:12px; margin-bottom:10px;
+  }
+  .readout .r-val{font-size:0.98rem; color:var(--text);}
+  .readout .r-val.dim{color:var(--muted); opacity:0.5;}
+  .readout .r-lbl{font-size:0.62rem; color:var(--muted); margin-top:2px;}
+
+  .autooff-row{display:flex; align-items:center; justify-content:space-between; font-size:0.72rem; color:var(--muted); border-top:1px solid var(--line); padding-top:10px;}
+  .autooff-row select{
+    background:var(--panel2); border:1px solid var(--line); border-radius:6px; color:var(--text);
+    font-family:var(--mono); font-size:0.7rem; padding:4px 6px;
+  }
+  .autooff-status{color:var(--copper); font-family:var(--mono);}
+
+  .schedule-block{border-top:1px solid var(--line); padding-top:10px; margin-top:10px;}
+  .schedule-row{display:flex; align-items:center; gap:8px; font-size:0.72rem; color:var(--muted); margin-bottom:8px;}
+  .schedule-row:last-child{margin-bottom:0;}
+  .schedule-row span{width:52px; flex-shrink:0;}
+  .schedule-row select{
+    background:var(--panel2); border:1px solid var(--line); border-radius:6px; color:var(--text);
+    font-family:var(--mono); font-size:0.68rem; padding:5px 6px; flex:1; min-width:0;
+  }
+  .schedule-row input[type="time"]{
+    background:var(--panel2); border:1px solid var(--line); border-radius:6px; color:var(--text);
+    font-family:var(--mono); font-size:0.68rem; padding:5px 6px; width:88px; flex-shrink:0;
+  }
+
+  .log-title{font-size:0.72rem; color:var(--muted); margin:22px 2px 8px; letter-spacing:0.3px;}
+  .log{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px; font-family:var(--mono); font-size:0.7rem; color:var(--muted);
+    max-height:110px; overflow-y:auto;
+  }
+  .log div{padding:2px 0; border-bottom:1px dashed rgba(255,255,255,0.04);}
+  .log div:last-child{border-bottom:none;}
+
+  .note{
+    margin-top:20px; font-size:0.68rem; color:var(--muted); line-height:1.55;
+    border-left:2px solid var(--copper-dim); padding-left:10px;
+  }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none;
+    align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .modal-overlay.open{display:flex;}
+  #menuOverlay{align-items:flex-start; justify-content:flex-start; padding:calc(64px + env(safe-area-inset-top,0px)) 16px 0;}
+  #menuOverlay .modal{width:auto; min-width:230px; max-width:260px; border-radius:14px; padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));}
+  .modal{
+    background:var(--panel); border:1px solid var(--line); border-radius:18px 18px 0 0;
+    padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));
+    width:100%; max-width:480px;
+  }
+  .modal h2{font-size:1rem; margin:0 0 4px;}
+  .modal p{font-size:0.72rem; color:var(--muted); margin:0 0 14px; line-height:1.5;}
+  .modal label{font-size:0.7rem; color:var(--muted); display:block; margin-bottom:6px;}
+  .modal input{
+    width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:11px 12px; color:var(--text); font-family:var(--mono); font-size:0.85rem; margin-bottom:14px;
+  }
+  .modal-btns{display:flex; gap:10px;}
+  .modal-btns button{
+    flex:1; border:none; border-radius:10px; padding:11px; font-family:var(--display); font-weight:600; font-size:0.85rem; cursor:pointer;
+  }
+  .btn-save{background:var(--copper-dim); color:var(--text);}
+  .btn-close{background:var(--panel2); color:var(--muted); border:1px solid var(--line) !important;}
+  .saved-ip{font-family:var(--mono); font-size:0.68rem; color:var(--on); margin-bottom:14px;}
+
+  .pw-wrap{position:relative;}
+  .pw-wrap input{padding-right:42px !important;}
+  .pw-toggle{
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--muted); cursor:pointer; padding:4px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pw-toggle svg{width:18px; height:18px;}
+
+  .app-greyed{filter:grayscale(1) brightness(0.45); pointer-events:none; user-select:none; transition:filter 0.5s ease;}
+  .wrap{transition:filter 0.5s ease;}
+
+  .header-bar{max-width:480px; margin:0 auto; padding:calc(14px + env(safe-area-inset-top,0px)) 18px 0;}
+  #powerBtn{color:#E05C5C; border-color:rgba(224,92,92,0.35); cursor:pointer;}
+  #powerBtn.power-on{color:var(--on); border-color:var(--copper-dim);}
+
+  #accountOverlay{align-items:flex-start; justify-content:flex-end; padding:calc(64px + env(safe-area-inset-top,0px)) 16px 0;}
+  #accountOverlay .modal{width:auto; min-width:210px; max-width:250px; border-radius:14px; padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));}
+  .profile-avatar{
+    width:56px; height:56px; border-radius:50%; background:var(--panel2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; margin:0 auto 10px;
+  }
+  .profile-avatar img{width:100%; height:100%; object-fit:cover;}
+  .profile-avatar svg{width:24px; height:24px; color:var(--muted);}
+  .profile-name{font-family:var(--mono); font-size:0.72rem; color:var(--text); margin-bottom:2px; word-break:break-all;}
+  .profile-hint{font-size:0.62rem; color:var(--muted);}
+  .header-avatar-thumb{width:100%; height:100%; border-radius:6px; object-fit:cover;}
+</style>
+</head>
+<body>
+<div class="header-bar">
+  <header>
+    <div class="hdr-left">
+      <div class="gear" id="menuBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </div>
+      <h1>Load<span>·</span>Control</h1>
+    </div>
+    <div class="hdr-right">
+      <div class="conn"><span class="dot"></span></div>
+      <button class="gear" id="powerBtn" title="System power">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+      </button>
+      <div class="gear" id="accountBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+    </div>
+  </header>
+</div>
+<div class="wrap">
+
+  <div class="gauge-wrap">
+    <div class="gauge-figure">
+      <svg class="dial" viewBox="0 0 220 130">
+        <path d="M 10 110 A 100 100 0 0 1 210 110" fill="none" stroke="#212B2D" stroke-width="10" stroke-linecap="round"/>
+        <path id="gaugeFill" d="M 10 110 A 100 100 0 0 1 210 110" fill="none" stroke="#D98A4A" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="314" stroke-dashoffset="314"/>
+        <line class="needle" id="needle" x1="110" y1="110" x2="110" y2="28" stroke="#EDEFEA" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="110" cy="110" r="6" fill="#EDEFEA"/>
+      </svg>
+      <div class="gauge-num" id="totalPower">0</div>
+      <div class="gauge-unit" id="gaugeUnitLabel">WATTS DRAWN</div>
+    </div>
+    <div class="gauge-sub">
+      <span><b id="loadsOn">0/0</b> loads on</span>
+      <span><b id="uptime">00:00</b> session</span>
+    </div>
+  </div>
+
+  <div class="history-card">
+    <div class="history-top"><span>POWER HISTORY</span><span id="historyMax">max 0W</span></div>
+    <svg id="historySvg" viewBox="0 0 300 44" preserveAspectRatio="none">
+      <polyline id="historyLine" points="" fill="none" stroke="#D98A4A" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <button class="cumulative-btn" id="cumulativeBtn">
+    <div class="cumulative-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 21 L11 13 L7 13 L13 3 L13 11 L17 11 Z"/></svg>
+    </div>
+    <div class="cumulative-text">
+      <div class="cumulative-label">CUMULATIVE ENERGY</div>
+      <div class="cumulative-val" id="cumulativeVal">0 Wh</div>
+    </div>
+    <div class="cumulative-chevron">›</div>
+  </button>
+
+  <div class="usage-card">
+    <div class="usage-top"><span>TOTAL POWER USAGE</span></div>
+    <div class="usage-tabs">
+      <button data-period="day" class="active">Day</button>
+      <button data-period="week">Week</button>
+      <button data-period="custom">Custom</button>
+    </div>
+    <div class="usage-controls" id="usageDayControls">
+      <input type="date" id="usageDayInput">
+    </div>
+    <div class="usage-controls" id="usageCustomControls" style="display:none;">
+      <input type="date" id="usageFromInput">
+      <span>to</span>
+      <input type="date" id="usageToInput">
+    </div>
+    <div class="usage-result">
+      <div class="usage-val" id="usageResultVal">0 Wh</div>
+      <div class="usage-sub" id="usageResultSub">Today</div>
+    </div>
+  </div>
+
+  <div class="token-card">
+    <div class="token-top">
+      <span>PREPAID BALANCE</span>
+      <span class="token-meter" id="meterNumberDisplay">No meter linked</span>
+    </div>
+    <div class="token-val" id="tokenBalanceVal">0.00 kWh</div>
+    <div class="token-last" id="tokenLastText"></div>
+    <button id="buyTokenBtn" class="master-toggle" style="width:100%; color:var(--on); border-color:var(--copper-dim);">Buy Token</button>
+  </div>
+
+  <div class="section-lbl"><span>Channels</span><button id="masterToggleBtn" class="master-toggle">Turn all ON</button></div>
+  <div class="add-row">
+    <input type="text" id="newDeviceName" placeholder="Device name, e.g. Kettle" maxlength="24">
+    <button id="addDeviceBtn">+ Add</button>
+  </div>
+
+  <div id="devicesContainer"></div>
+
+  <div class="log-title">Event log</div>
+  <div class="log" id="log"></div>
+
+  <div class="note">
+    Readings are simulated — no ESP32 connected yet. Add your device names above; each gets its own relay channel and simulated voltage/current/power. Set the ESP32 IP in Settings now so the app is ready to switch from simulated to live data later.
+  </div>
+</div>
+
+<div class="modal-overlay" id="menuOverlay">
+  <div class="modal">
+    <div class="menu-header">
+      <div class="menu-logo">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 21 L11 13 L7 13 L13 3 L13 11 L17 11 Z"/></svg>
+      </div>
+      <div class="menu-header-text">
+        <div class="name">Load Control</div>
+        <div class="tagline">Smartphone load monitoring</div>
+      </div>
+    </div>
+
+    <div id="menuAccountStatus"></div>
+    <div class="menu-section-lbl">ACCOUNT</div>
+    <div class="menu-list">
+      <button class="menu-item" id="menuLoginBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div><div>Log in</div></div>
+      </button>
+      <button class="menu-item" id="menuSignupBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <div><div>Sign up</div></div>
+      </button>
+      <button class="menu-item" id="menuAccountBtn" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div><div>Account</div><span class="sub" id="accountEmailSub"></span></div>
+      </button>
+      <button class="menu-item" id="menuEsp32Btn" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/></svg>
+        <div><div>ESP32</div><span class="sub">Device connection settings</span></div>
+      </button>
+      <button class="menu-item danger" id="menuLogoutBtn" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <div><div>Sign out</div></div>
+      </button>
+    </div>
+
+    <div class="menu-section-lbl">APP</div>
+    <div class="menu-list">
+      <button class="menu-item" id="menuSettingsBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <div><div>Settings</div><span class="sub">ESP32 IP address</span></div>
+      </button>
+      <button class="menu-item" id="menuAboutBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div><div>About / Help</div><span class="sub">What this app does</span></div>
+      </button>
+    </div>
+
+    <div class="modal-btns" style="margin-top:8px;">
+      <button class="btn-close" id="closeMenuBtn">Close</button>
+    </div>
+    <div class="menu-footer">Load Control v1.0.0 · simulated build</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="loginOverlay">
+  <div class="modal">
+    <h2 id="authModalTitle">Sign In</h2>
+    <p id="authModalDesc">Sign in with the email and password you used to sign up.</p>
+    <label for="loginEmail">Email</label>
+    <input type="email" id="loginEmail" placeholder="you@example.com">
+    <label for="loginPassword">Password</label>
+    <div class="pw-wrap" style="margin-bottom:14px;">
+      <input type="password" id="loginPassword" placeholder="••••••••" style="margin-bottom:0;">
+      <button type="button" class="pw-toggle" data-pw-toggle="loginPassword">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <div id="confirmPwWrap" style="display:none;">
+      <label for="loginPasswordConfirm">Confirm password</label>
+      <div class="pw-wrap" style="margin-bottom:14px;">
+        <input type="password" id="loginPasswordConfirm" placeholder="••••••••" style="margin-bottom:0;">
+        <button type="button" class="pw-toggle" data-pw-toggle="loginPasswordConfirm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="loginError" style="display:none; color:#E08A6B; font-size:0.7rem; margin:-8px 0 12px;"></div>
+    <div class="modal-btns">
+      <button class="btn-close" id="closeLoginBtn">Cancel</button>
+      <button class="btn-save" id="doLoginBtn">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="accountOverlay">
+  <div class="modal">
+    <div id="accountLoggedOutView">
+      <div class="menu-list">
+        <button class="menu-item" id="accPanelLoginBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <div>Log in</div>
+        </button>
+        <button class="menu-item" id="accPanelSignupBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <div>Sign up</div>
+        </button>
+      </div>
+    </div>
+    <div id="accountLoggedInView" style="display:none; text-align:center; padding:6px 0 4px;">
+      <div class="profile-avatar" id="profileAvatarBtn">
+        <img id="profileAvatarImg" style="display:none;" alt="Profile picture">
+        <svg id="profileAvatarPlaceholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="profile-name" id="profileNameText"></div>
+      <div class="profile-hint">Tap photo to change</div>
+    </div>
+    <input type="file" id="profilePicInput" accept="image/*" style="display:none;">
+    <div class="modal-btns" style="margin-top:10px;">
+      <button class="btn-close" id="closeAccountBtn" style="flex:1;">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cumulativeOverlay">
+  <div class="modal">
+    <h2>Cumulative Energy</h2>
+    <p>Total simulated energy drawn across all devices since this session started (or since last reset).</p>
+    <div style="font-family:var(--mono); font-size:1.6rem; color:var(--copper); text-align:center; margin:10px 0 4px;" id="cumulativeDetailVal">0 Wh</div>
+    <div style="text-align:center; font-size:0.68rem; color:var(--muted); margin-bottom:16px;" id="cumulativeSinceText"></div>
+    <div class="modal-btns">
+      <button class="btn-close" id="closeCumulativeBtn">Close</button>
+      <button class="btn-save" id="resetCumulativeBtn" style="background:#E05C5C;">Reset</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tokenOverlay">
+  <div class="modal">
+    <h2>Buy Prepaid Token</h2>
+    <p>Simulated KPLC-style token purchase for this project — no real payment is processed and no live tariff is used. The rate below is a placeholder.</p>
+    <label for="meterNumberInput">Meter number</label>
+    <input type="text" id="meterNumberInput" placeholder="e.g. 01234567890">
+    <label for="tokenAmountInput">Amount (KES)</label>
+    <input type="number" id="tokenAmountInput" placeholder="e.g. 500" min="1">
+    <div id="tokenError" style="display:none; color:#E08A6B; font-size:0.7rem; margin:-8px 0 12px;"></div>
+    <div class="modal-btns">
+      <button class="btn-close" id="closeTokenBtn">Cancel</button>
+      <button class="btn-save" id="confirmTokenBtn">Buy</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="removeConfirmOverlay">
+  <div class="modal">
+    <h2>Remove device?</h2>
+    <p id="removeConfirmText">This will remove the device and its settings. This can't be undone.</p>
+    <div class="modal-btns">
+      <button class="btn-close" id="cancelRemoveBtn">Cancel</button>
+      <button class="btn-save" id="confirmRemoveBtn" style="background:#E05C5C;">Remove</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="aboutOverlay">
+  <div class="modal">
+    <h2>About Load Control</h2>
+    <p>This app is a smartphone interface for remotely switching AC loads (like a lamp or fan) and monitoring their voltage, current and power draw. It's built for use with an ESP32 microcontroller and relay modules.</p>
+    <p>Right now every reading is simulated so the interface and control flow can be tested ahead of the hardware build. Once the ESP32 is wired up, the app's simulated readings get replaced with real HTTP calls to the device's IP address, which you can set under Settings.</p>
+    <div class="modal-btns">
+      <button class="btn-close" id="closeAboutBtn" style="flex:1;">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Device Settings</h2>
+    <p>Enter your ESP32's IP address on your local network. Not used yet — the app still runs on simulated data — but this is where live control will connect once your hardware is built.</p>
+    <div id="savedIpDisplay"></div>
+    <label for="ipInput">ESP32 IP address</label>
+    <input type="text" id="ipInput" placeholder="e.g. 192.168.1.42">
+    <label for="unitSelect">Power display units</label>
+    <select id="unitSelect" style="width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:11px 12px; color:var(--text); font-family:var(--mono); font-size:0.85rem; margin-bottom:14px;">
+      <option value="W">Watts (W)</option>
+      <option value="kW">Kilowatts (kW)</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn-close" id="closeModalBtn">Close</button>
+      <button class="btn-save" id="saveIpBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUNRISE_TIME = '06:30';
+const SUNSET_TIME = '18:45';
+function newSchedule(){ return { onOpt:'none', onTime:'', offOpt:'none', offTime:'', lastOnDate:null, lastOffDate:null }; }
+
+let devices = [
+  { id: 'lamp', name: 'Lamp', on: false, rated: 60, autoOff: 0, autoOffAt: null, schedule: newSchedule() },
+  { id: 'fan',  name: 'Fan',  on: false, rated: 75, autoOff: 0, autoOffAt: null, schedule: newSchedule() }
+];
+const startTime = Date.now();
+const logEl = document.getElementById('log');
+const needle = document.getElementById('needle');
+const gaugeFill = document.getElementById('gaugeFill');
+const devicesContainer = document.getElementById('devicesContainer');
+const historyLine = document.getElementById('historyLine');
+const historyMax = document.getElementById('historyMax');
+let powerHistory = [];
+const HISTORY_LEN = 40;
+let pendingRemoveId = null;
+let cumulativeWh = 0;
+let lastCumTime = Date.now();
+const sessionStartClock = new Date();
+function formatEnergy(wh){
+  if(wh >= 1000) return (wh/1000).toFixed(2)+' kWh';
+  return wh.toFixed(1)+' Wh';
+}
+function dateStr(d){ return d.toISOString().slice(0,10); }
+function getEnergyLog(){
+  try{ return JSON.parse(localStorage.getItem('energy_log') || '{}'); }catch(e){ return {}; }
+}
+function saveEnergyLog(logObj){
+  try{ localStorage.setItem('energy_log', JSON.stringify(logObj)); }catch(e){}
+}
+let energyLog = getEnergyLog();
+let usagePeriod = 'day';
+
+const KES_PER_KWH = 25; // placeholder rate for simulation only
+const LOW_BALANCE_THRESHOLD = 1; // kWh
+let tokenBalanceKWh = parseFloat(localStorage.getItem('token_balance_kwh')) || 0;
+let meterNumber = localStorage.getItem('meter_number') || '';
+
+function generateFakeToken(){
+  let digits = '';
+  for(let i=0;i<20;i++) digits += Math.floor(Math.random()*10);
+  return digits.match(/.{1,4}/g).join(' ');
+}
+function refreshTokenDisplay(){
+  const valEl = document.getElementById('tokenBalanceVal');
+  valEl.textContent = tokenBalanceKWh.toFixed(2)+' kWh';
+  valEl.classList.toggle('low', tokenBalanceKWh < LOW_BALANCE_THRESHOLD);
+  document.getElementById('meterNumberDisplay').textContent = meterNumber ? 'Meter '+meterNumber : 'No meter linked';
+}
+let unitPref = 'W';
+try{ unitPref = localStorage.getItem('power_unit') || 'W'; }catch(e){}
+function formatPower(watts){
+  if(unitPref === 'kW') return (watts/1000).toFixed(2)+' kW';
+  return Math.round(watts)+' W';
+}
+
+function log(msg){
+  const t = new Date().toLocaleTimeString('en-GB',{hour12:false});
+  const line = document.createElement('div');
+  line.textContent = `[${t}] ${msg}`;
+  logEl.prepend(line);
+  while(logEl.children.length > 20) logEl.removeChild(logEl.lastChild);
+}
+function jitter(base, pct){ return base + (Math.random()*2-1)*base*pct; }
+
+function autoOffLabel(mins){
+  if(!mins) return 'Off';
+  return mins + ' min';
+}
+
+function buildDeviceCard(d){
+  const card = document.createElement('div');
+  card.className = 'load-card';
+  card.dataset.id = d.id;
+  card.innerHTML = `
+    <div class="flow-line"></div>
+    <div class="load-top">
+      <div class="load-name-row">
+        <div class="status-dot" data-status-dot></div>
+        <div>
+          <div class="load-name">${d.name}</div>
+          <div class="load-sub">RELAY CH.${d.channel}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="remove-btn" data-remove="${d.id}">✕</button>
+        <button class="rocker" data-target="${d.id}"></button>
+      </div>
+    </div>
+    <div class="readout">
+      <div><div class="r-val dim" data-field="voltage">0.0 V</div><div class="r-lbl">voltage</div></div>
+      <div><div class="r-val dim" data-field="current">0.00 A</div><div class="r-lbl">current</div></div>
+      <div><div class="r-val dim" data-field="power">0 W</div><div class="r-lbl">power</div></div>
+    </div>
+    <div class="autooff-row">
+      <span>Auto-off <span class="autooff-status" data-autooff-status></span></span>
+      <select data-autooff="${d.id}">
+        <option value="0">Off</option>
+        <option value="5">5 min</option>
+        <option value="15">15 min</option>
+        <option value="30">30 min</option>
+        <option value="60">60 min</option>
+      </select>
+    </div>
+    <div class="schedule-block">
+      <div class="schedule-row">
+        <span>Turn ON</span>
+        <select data-sched-on-opt="${d.id}">
+          <option value="none">Never</option>
+          <option value="sunrise">Sunrise (~${SUNRISE_TIME})</option>
+          <option value="sunset">Sunset (~${SUNSET_TIME})</option>
+          <option value="custom">Custom time</option>
+        </select>
+        <input type="time" data-sched-on-time="${d.id}" style="display:none;">
+      </div>
+      <div class="schedule-row">
+        <span>Turn OFF</span>
+        <select data-sched-off-opt="${d.id}">
+          <option value="none">Never</option>
+          <option value="sunrise">Sunrise (~${SUNRISE_TIME})</option>
+          <option value="sunset">Sunset (~${SUNSET_TIME})</option>
+          <option value="custom">Custom time</option>
+        </select>
+        <input type="time" data-sched-off-time="${d.id}" style="display:none;">
+      </div>
+    </div>
+  `;
+  card.querySelector(`select[data-autooff]`).value = d.autoOff;
+  card.querySelector(`select[data-sched-on-opt]`).value = d.schedule.onOpt;
+  card.querySelector(`select[data-sched-off-opt]`).value = d.schedule.offOpt;
+  const onTimeInput = card.querySelector(`input[data-sched-on-time]`);
+  const offTimeInput = card.querySelector(`input[data-sched-off-time]`);
+  onTimeInput.value = d.schedule.onTime;
+  offTimeInput.value = d.schedule.offTime;
+  onTimeInput.style.display = d.schedule.onOpt === 'custom' ? 'block' : 'none';
+  offTimeInput.style.display = d.schedule.offOpt === 'custom' ? 'block' : 'none';
+  return card;
+}
+
+function renderDeviceList(){
+  devicesContainer.innerHTML = '';
+  devices.forEach((d,i)=>{
+    d.channel = i+1;
+    devicesContainer.appendChild(buildDeviceCard(d));
+  });
+  attachDeviceListeners();
+}
+
+function attachDeviceListeners(){
+  document.querySelectorAll('.rocker').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const d = devices.find(x=>x.id===btn.dataset.target);
+      d.on = !d.on;
+      if(d.on && d.autoOff){
+        d.autoOffAt = Date.now() + d.autoOff*60000;
+      } else {
+        d.autoOffAt = null;
+      }
+      log(`${d.name} switched ${d.on ? 'ON' : 'OFF'}`);
+      render();
+    });
+  });
+  document.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.remove;
+      const d = devices.find(x=>x.id===id);
+      pendingRemoveId = id;
+      document.getElementById('removeConfirmText').textContent = `Remove "${d.name}"? This will delete its settings and can't be undone.`;
+      document.getElementById('removeConfirmOverlay').classList.add('open');
+    });
+  });
+  document.querySelectorAll('[data-autooff]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const d = devices.find(x=>x.id===sel.dataset.autooff);
+      d.autoOff = parseInt(sel.value,10);
+      if(d.on && d.autoOff){
+        d.autoOffAt = Date.now() + d.autoOff*60000;
+      } else {
+        d.autoOffAt = null;
+      }
+      log(`${d.name} auto-off set to ${autoOffLabel(d.autoOff)}`);
+    });
+  });
+  document.querySelectorAll('[data-sched-on-opt]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const d = devices.find(x=>x.id===sel.dataset.schedOnOpt);
+      d.schedule.onOpt = sel.value;
+      const timeInput = sel.parentElement.querySelector('input[data-sched-on-time]');
+      timeInput.style.display = sel.value === 'custom' ? 'block' : 'none';
+      log(`${d.name} scheduled ON: ${scheduleLabel(d.schedule.onOpt, d.schedule.onTime)}`);
+      renderDeviceList();
+    });
+  });
+  document.querySelectorAll('[data-sched-off-opt]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const d = devices.find(x=>x.id===sel.dataset.schedOffOpt);
+      d.schedule.offOpt = sel.value;
+      const timeInput = sel.parentElement.querySelector('input[data-sched-off-time]');
+      timeInput.style.display = sel.value === 'custom' ? 'block' : 'none';
+      log(`${d.name} scheduled OFF: ${scheduleLabel(d.schedule.offOpt, d.schedule.offTime)}`);
+      renderDeviceList();
+    });
+  });
+  document.querySelectorAll('[data-sched-on-time]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const d = devices.find(x=>x.id===inp.dataset.schedOnTime);
+      d.schedule.onTime = inp.value;
+      log(`${d.name} scheduled ON: ${scheduleLabel(d.schedule.onOpt, d.schedule.onTime)}`);
+    });
+  });
+  document.querySelectorAll('[data-sched-off-time]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const d = devices.find(x=>x.id===inp.dataset.schedOffTime);
+      d.schedule.offTime = inp.value;
+      log(`${d.name} scheduled OFF: ${scheduleLabel(d.schedule.offOpt, d.schedule.offTime)}`);
+    });
+  });
+}
+
+function scheduleLabel(opt, customTime){
+  if(opt === 'none') return 'never';
+  if(opt === 'sunrise') return 'sunrise (~'+SUNRISE_TIME+')';
+  if(opt === 'sunset') return 'sunset (~'+SUNSET_TIME+')';
+  return customTime || 'custom (not set)';
+}
+function resolvedScheduleTime(opt, customTime){
+  if(opt === 'sunrise') return SUNRISE_TIME;
+  if(opt === 'sunset') return SUNSET_TIME;
+  if(opt === 'custom') return customTime || null;
+  return null;
+}
+
+document.getElementById('addDeviceBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('newDeviceName');
+  const name = input.value.trim();
+  if(!name) return;
+  const id = 'dev_' + Date.now();
+  devices.push({ id, name, on:false, rated: Math.round(jitter(50,0.2)), autoOff:0, autoOffAt:null, schedule:newSchedule() });
+  input.value = '';
+  log(`${name} added`);
+  renderDeviceList();
+  render();
+});
+document.getElementById('newDeviceName').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('addDeviceBtn').click();
+});
+
+function render(){
+  let totalPower = 0, onCount = 0;
+  const now = Date.now();
+
+  devices.forEach(d=>{
+    if(d.on && d.autoOffAt && now >= d.autoOffAt){
+      d.on = false;
+      d.autoOffAt = null;
+      log(`${d.name} auto-switched OFF (timer elapsed)`);
+    }
+  });
+
+  const nowDate = new Date();
+  const todayStr = nowDate.toISOString().slice(0,10);
+  const nowHHMM = String(nowDate.getHours()).padStart(2,'0')+':'+String(nowDate.getMinutes()).padStart(2,'0');
+  devices.forEach(d=>{
+    const onTarget = resolvedScheduleTime(d.schedule.onOpt, d.schedule.onTime);
+    if(onTarget && onTarget === nowHHMM && d.schedule.lastOnDate !== todayStr){
+      d.schedule.lastOnDate = todayStr;
+      if(!d.on){
+        d.on = true;
+        if(d.autoOff) d.autoOffAt = Date.now() + d.autoOff*60000;
+        log(`${d.name} scheduled ON triggered (${scheduleLabel(d.schedule.onOpt, d.schedule.onTime)})`);
+      }
+    }
+    const offTarget = resolvedScheduleTime(d.schedule.offOpt, d.schedule.offTime);
+    if(offTarget && offTarget === nowHHMM && d.schedule.lastOffDate !== todayStr){
+      d.schedule.lastOffDate = todayStr;
+      if(d.on){
+        d.on = false;
+        d.autoOffAt = null;
+        log(`${d.name} scheduled OFF triggered (${scheduleLabel(d.schedule.offOpt, d.schedule.offTime)})`);
+      }
+    }
+  });
+
+  document.querySelectorAll('.load-card').forEach(card=>{
+    const id = card.dataset.id;
+    const d = devices.find(x=>x.id===id);
+    if(!d) return;
+    const sw = card.querySelector('.rocker');
+    sw.classList.toggle('on', d.on);
+    card.classList.toggle('active', d.on);
+    card.querySelector('[data-status-dot]').classList.toggle('on', d.on);
+
+    const vEl = card.querySelector('[data-field="voltage"]');
+    const cEl = card.querySelector('[data-field="current"]');
+    const pEl = card.querySelector('[data-field="power"]');
+    const statusEl = card.querySelector('[data-autooff-status]');
+
+    if(d.on){
+      const voltage = jitter(230, 0.01);
+      const power = jitter(d.rated, 0.06);
+      const current = power / voltage;
+      vEl.textContent = voltage.toFixed(1)+' V';
+      cEl.textContent = current.toFixed(2)+' A';
+      pEl.textContent = formatPower(power);
+      [vEl,cEl,pEl].forEach(e=>e.classList.remove('dim'));
+      totalPower += power;
+      onCount++;
+      if(d.autoOffAt){
+        const remain = Math.max(0, Math.ceil((d.autoOffAt-now)/60000));
+        statusEl.textContent = `(${remain}m left)`;
+      } else {
+        statusEl.textContent = '';
+      }
+    } else {
+      vEl.textContent = '0.0 V';
+      cEl.textContent = '0.00 A';
+      pEl.textContent = formatPower(0);
+      [vEl,cEl,pEl].forEach(e=>e.classList.add('dim'));
+      statusEl.textContent = '';
+    }
+  });
+
+  const nowTick = Date.now();
+  const deltaHours = (nowTick - lastCumTime) / 3600000;
+  const deltaWh = totalPower * deltaHours;
+  cumulativeWh += deltaWh;
+  lastCumTime = nowTick;
+  const cumEl = document.getElementById('cumulativeVal');
+  if(cumEl) cumEl.textContent = formatEnergy(cumulativeWh);
+
+  const todayKey = dateStr(new Date());
+  energyLog[todayKey] = (energyLog[todayKey] || 0) + deltaWh;
+  saveEnergyLog(energyLog);
+  refreshUsageDisplay();
+
+  if(deltaWh > 0){
+    const wasLow = tokenBalanceKWh < LOW_BALANCE_THRESHOLD;
+    tokenBalanceKWh = Math.max(0, tokenBalanceKWh - deltaWh/1000);
+    try{ localStorage.setItem('token_balance_kwh', tokenBalanceKWh.toFixed(4)); }catch(e){}
+    refreshTokenDisplay();
+    if(!wasLow && tokenBalanceKWh < LOW_BALANCE_THRESHOLD){
+      log('Low prepaid balance — consider buying a token');
+    }
+  }
+
+  document.getElementById('totalPower').textContent = unitPref === 'kW' ? (totalPower/1000).toFixed(2) : Math.round(totalPower);
+  document.getElementById('gaugeUnitLabel').textContent = unitPref === 'kW' ? 'KILOWATTS DRAWN' : 'WATTS DRAWN';
+  document.getElementById('loadsOn').textContent = onCount+'/'+devices.length;
+  const masterBtn = document.getElementById('masterToggleBtn');
+  if(masterBtn){
+    masterBtn.textContent = onCount > 0 ? 'Turn all OFF' : 'Turn all ON';
+    masterBtn.classList.toggle('state-on', onCount > 0);
+  }
+
+  const maxPower = Math.max(150, devices.length*100);
+  const frac = Math.min(totalPower / maxPower, 1);
+  const angle = -90 + frac*180;
+  needle.style.transform = `rotate(${angle}deg)`;
+  const circumference = 314;
+  gaugeFill.style.strokeDashoffset = circumference - frac*circumference;
+
+  powerHistory.push(totalPower);
+  if(powerHistory.length > HISTORY_LEN) powerHistory.shift();
+  const peak = Math.max(10, ...powerHistory);
+  historyMax.textContent = 'max ' + formatPower(peak);
+  const pts = powerHistory.map((v,i)=>{
+    const x = (i/(HISTORY_LEN-1))*300;
+    const y = 42 - (v/peak)*38;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  historyLine.setAttribute('points', pts);
+
+  const secs = Math.floor((Date.now()-startTime)/1000);
+  const mm = String(Math.floor(secs/60)).padStart(2,'0');
+  const ss = String(secs%60).padStart(2,'0');
+  document.getElementById('uptime').textContent = `${mm}:${ss}`;
+}
+
+// Settings modal
+const modalOverlay = document.getElementById('modalOverlay');
+const savedIpDisplay = document.getElementById('savedIpDisplay');
+function refreshSavedIpDisplay(){
+  const ip = localStorage.getItem('esp32_ip');
+  savedIpDisplay.innerHTML = ip ? `<div class="saved-ip">Currently saved: ${ip}</div>` : '';
+  document.getElementById('ipInput').value = ip || '';
+  document.getElementById('unitSelect').value = unitPref;
+}
+const menuOverlay = document.getElementById('menuOverlay');
+const loginOverlay = document.getElementById('loginOverlay');
+const menuAccountStatus = document.getElementById('menuAccountStatus');
+
+function refreshAccountUI(){
+  let name = null;
+  try{ name = localStorage.getItem('account_name'); }catch(e){}
+  const loginBtn = document.getElementById('menuLoginBtn');
+  const signupBtn = document.getElementById('menuSignupBtn');
+  const logoutBtn = document.getElementById('menuLogoutBtn');
+  const accountBtn = document.getElementById('menuAccountBtn');
+  const esp32Btn = document.getElementById('menuEsp32Btn');
+  if(name){
+    menuAccountStatus.innerHTML = `<div class="account-status">Signed in as ${name}</div>`;
+    document.getElementById('accountEmailSub').textContent = name;
+    loginBtn.style.display = 'none';
+    signupBtn.style.display = 'none';
+    accountBtn.style.display = 'flex';
+    esp32Btn.style.display = 'flex';
+    logoutBtn.style.display = 'flex';
+  } else {
+    menuAccountStatus.innerHTML = '';
+    loginBtn.style.display = 'flex';
+    signupBtn.style.display = 'flex';
+    accountBtn.style.display = 'none';
+    esp32Btn.style.display = 'none';
+    logoutBtn.style.display = 'none';
+  }
+  try{ refreshHeaderAccountIcon(); }catch(e){}
+}
+
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  refreshAccountUI();
+  menuOverlay.classList.add('open');
+});
+document.getElementById('closeMenuBtn').addEventListener('click', ()=> menuOverlay.classList.remove('open'));
+menuOverlay.addEventListener('click', (e)=>{ if(e.target === menuOverlay) menuOverlay.classList.remove('open'); });
+
+document.getElementById('menuSettingsBtn').addEventListener('click', ()=>{
+  menuOverlay.classList.remove('open');
+  try{ refreshSavedIpDisplay(); }catch(e){}
+  modalOverlay.classList.add('open');
+});
+let currentAuthMode = 'login';
+function openLoginModal(mode){
+  currentAuthMode = mode || 'login';
+  const isSignup = currentAuthMode === 'signup';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginPasswordConfirm').value = '';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('authModalTitle').textContent = isSignup ? 'Create Account' : 'Sign In';
+  document.getElementById('authModalDesc').textContent = isSignup
+    ? 'Create a local account — stored only on this device, no server involved.'
+    : 'Sign in with the email and password you used to sign up.';
+  document.getElementById('confirmPwWrap').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('doLoginBtn').textContent = isSignup ? 'Create Account' : 'Sign In';
+  loginOverlay.classList.add('open');
+}
+document.getElementById('menuLoginBtn').addEventListener('click', ()=>{
+  menuOverlay.classList.remove('open');
+  openLoginModal('login');
+});
+document.getElementById('menuSignupBtn').addEventListener('click', ()=>{
+  menuOverlay.classList.remove('open');
+  openLoginModal('signup');
+});
+document.getElementById('closeLoginBtn').addEventListener('click', ()=> loginOverlay.classList.remove('open'));
+loginOverlay.addEventListener('click', (e)=>{ if(e.target === loginOverlay) loginOverlay.classList.remove('open'); });
+function getAccounts(){
+  try{ return JSON.parse(localStorage.getItem('accounts') || '{}'); }catch(e){ return {}; }
+}
+function saveAccounts(accounts){
+  try{ localStorage.setItem('accounts', JSON.stringify(accounts)); }catch(e){}
+}
+document.getElementById('doLoginBtn').addEventListener('click', ()=>{
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pw = document.getElementById('loginPassword').value;
+  const pwConfirm = document.getElementById('loginPasswordConfirm').value;
+  const errEl = document.getElementById('loginError');
+  const accounts = getAccounts();
+
+  if(currentAuthMode === 'signup'){
+    if(!email || !pw || !pwConfirm){
+      errEl.textContent = 'Please fill in email, password and confirm password.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if(pw !== pwConfirm){
+      errEl.textContent = 'Passwords do not match — please re-enter.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if(accounts[email]){
+      errEl.textContent = 'An account with this email already exists — try Sign In instead.';
+      errEl.style.display = 'block';
+      return;
+    }
+    accounts[email] = pw;
+    saveAccounts(accounts);
+    log(`Account created and signed in as ${email}`);
+  } else {
+    if(!email || !pw){
+      errEl.textContent = 'Please enter your email and password.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if(!accounts[email]){
+      errEl.textContent = 'No account found for this email — try Sign Up first.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if(accounts[email] !== pw){
+      errEl.textContent = 'Incorrect password — please try again.';
+      errEl.style.display = 'block';
+      return;
+    }
+    log(`Signed in as ${email}`);
+  }
+
+  errEl.style.display = 'none';
+  try{ localStorage.setItem('account_name', email); }catch(e){}
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginPasswordConfirm').value = '';
+  loginOverlay.classList.remove('open');
+  refreshAccountUI();
+  try{ refreshAccountPanel(); }catch(e){}
+});
+document.getElementById('menuEsp32Btn').addEventListener('click', ()=>{
+  menuOverlay.classList.remove('open');
+  try{ refreshSavedIpDisplay(); }catch(e){}
+  modalOverlay.classList.add('open');
+});
+document.getElementById('menuAccountBtn').addEventListener('click', ()=>{
+  let name = null;
+  try{ name = localStorage.getItem('account_name'); }catch(e){}
+  log(`Viewing account: ${name}`);
+});
+document.getElementById('menuLogoutBtn').addEventListener('click', ()=>{
+  let name = null;
+  try{ name = localStorage.getItem('account_name'); localStorage.removeItem('account_name'); }catch(e){}
+  log(name ? `Signed out (${name})` : 'Signed out');
+  refreshAccountUI();
+});
+
+const cumulativeOverlay = document.getElementById('cumulativeOverlay');
+document.getElementById('cumulativeBtn').addEventListener('click', ()=>{
+  document.getElementById('cumulativeDetailVal').textContent = formatEnergy(cumulativeWh);
+  document.getElementById('cumulativeSinceText').textContent = 'Since ' + sessionStartClock.toLocaleTimeString('en-GB',{hour12:false});
+  cumulativeOverlay.classList.add('open');
+});
+cumulativeOverlay.addEventListener('click', (e)=>{ if(e.target === cumulativeOverlay) cumulativeOverlay.classList.remove('open'); });
+document.getElementById('closeCumulativeBtn').addEventListener('click', ()=> cumulativeOverlay.classList.remove('open'));
+document.getElementById('resetCumulativeBtn').addEventListener('click', ()=>{
+  cumulativeWh = 0;
+  lastCumTime = Date.now();
+  log('Cumulative energy reset');
+  document.getElementById('cumulativeDetailVal').textContent = formatEnergy(cumulativeWh);
+  document.getElementById('cumulativeVal').textContent = formatEnergy(cumulativeWh);
+});
+
+const tokenOverlay = document.getElementById('tokenOverlay');
+document.getElementById('buyTokenBtn').addEventListener('click', ()=>{
+  document.getElementById('meterNumberInput').value = meterNumber;
+  document.getElementById('tokenAmountInput').value = '';
+  document.getElementById('tokenError').style.display = 'none';
+  tokenOverlay.classList.add('open');
+});
+tokenOverlay.addEventListener('click', (e)=>{ if(e.target === tokenOverlay) tokenOverlay.classList.remove('open'); });
+document.getElementById('closeTokenBtn').addEventListener('click', ()=> tokenOverlay.classList.remove('open'));
+const SIMULATED_WALLET_BALANCE = 300; // placeholder simulated mobile-money balance, KES
+function finalizeTokenPurchase(meter, amount){
+  meterNumber = meter;
+  try{ localStorage.setItem('meter_number', meterNumber); }catch(e){}
+  const kwhPurchased = amount / KES_PER_KWH;
+  tokenBalanceKWh += kwhPurchased;
+  try{ localStorage.setItem('token_balance_kwh', tokenBalanceKWh.toFixed(4)); }catch(e){}
+  const token = generateFakeToken();
+  document.getElementById('tokenLastText').textContent = `Last token: ${token}`;
+  log(`Token purchased: KES ${amount} → ${kwhPurchased.toFixed(2)} kWh (meter ${meterNumber})`);
+  refreshTokenDisplay();
+  tokenOverlay.classList.remove('open');
+}
+
+document.getElementById('confirmTokenBtn').addEventListener('click', ()=>{
+  const meter = document.getElementById('meterNumberInput').value.trim();
+  const amount = parseFloat(document.getElementById('tokenAmountInput').value);
+  const errEl = document.getElementById('tokenError');
+  if(!meter){
+    errEl.textContent = 'Please enter a meter number.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if(!amount || amount <= 0){
+    errEl.textContent = 'Please enter a valid amount.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  if(amount > SIMULATED_WALLET_BALANCE){
+    const shortfall = amount - SIMULATED_WALLET_BALANCE;
+    const proceed = confirm(
+      `Simulated balance insufficient. Available: KES ${SIMULATED_WALLET_BALANCE}, needed: KES ${amount} (short by KES ${shortfall}).\n\n` +
+      `Proceed anyway using a simulated top-up advance for the shortfall?`
+    );
+    if(!proceed){
+      log('Token purchase cancelled — simulated balance insufficient');
+      return;
+    }
+    log(`Simulated top-up advance of KES ${shortfall} used to cover shortfall`);
+  }
+
+  finalizeTokenPurchase(meter, amount);
+});
+
+const usageDayInput = document.getElementById('usageDayInput');
+const usageFromInput = document.getElementById('usageFromInput');
+const usageToInput = document.getElementById('usageToInput');
+usageDayInput.value = dateStr(new Date());
+usageFromInput.value = dateStr(new Date());
+usageToInput.value = dateStr(new Date());
+
+function sumRange(fromDate, toDate){
+  let sum = 0;
+  const cur = new Date(fromDate);
+  const end = new Date(toDate);
+  while(cur <= end){
+    sum += energyLog[dateStr(cur)] || 0;
+    cur.setDate(cur.getDate()+1);
+  }
+  return sum;
+}
+
+function refreshUsageDisplay(){
+  const resultVal = document.getElementById('usageResultVal');
+  const resultSub = document.getElementById('usageResultSub');
+  if(usagePeriod === 'day'){
+    const d = usageDayInput.value ? new Date(usageDayInput.value) : new Date();
+    const wh = energyLog[dateStr(d)] || 0;
+    resultVal.textContent = formatEnergy(wh);
+    resultSub.textContent = dateStr(d) === dateStr(new Date()) ? 'Today' : usageDayInput.value;
+  } else if(usagePeriod === 'week'){
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate()-6);
+    const wh = sumRange(start, end);
+    resultVal.textContent = formatEnergy(wh);
+    resultSub.textContent = 'Last 7 days';
+  } else {
+    const from = usageFromInput.value ? new Date(usageFromInput.value) : new Date();
+    const to = usageToInput.value ? new Date(usageToInput.value) : new Date();
+    const wh = sumRange(from, to);
+    resultVal.textContent = formatEnergy(wh);
+    resultSub.textContent = usageFromInput.value + ' – ' + usageToInput.value;
+  }
+}
+
+document.querySelectorAll('.usage-tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.usage-tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    usagePeriod = btn.dataset.period;
+    document.getElementById('usageDayControls').style.display = usagePeriod === 'day' ? 'flex' : 'none';
+    document.getElementById('usageCustomControls').style.display = usagePeriod === 'custom' ? 'flex' : 'none';
+    refreshUsageDisplay();
+  });
+});
+usageDayInput.addEventListener('change', refreshUsageDisplay);
+usageFromInput.addEventListener('change', refreshUsageDisplay);
+usageToInput.addEventListener('change', refreshUsageDisplay);
+
+document.getElementById('masterToggleBtn').addEventListener('click', ()=>{
+  const anyOn = devices.some(d=>d.on);
+  const turnOn = !anyOn;
+  devices.forEach(d=>{
+    d.on = turnOn;
+    d.autoOffAt = (turnOn && d.autoOff) ? Date.now()+d.autoOff*60000 : null;
+  });
+  log(turnOn ? 'All devices switched ON' : 'All devices switched OFF');
+  render();
+});
+
+const accountOverlay = document.getElementById('accountOverlay');
+
+function getProfilePic(){ try{ return localStorage.getItem('profile_pic'); }catch(e){ return null; } }
+
+function refreshHeaderAccountIcon(){
+  let name = null;
+  try{ name = localStorage.getItem('account_name'); }catch(e){}
+  const pic = getProfilePic();
+  const btn = document.getElementById('accountBtn');
+  if(name && pic){
+    btn.innerHTML = `<img class="header-avatar-thumb" src="${pic}" alt="Account">`;
+  } else {
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  }
+}
+
+function refreshAccountPanel(){
+  let name = null;
+  try{ name = localStorage.getItem('account_name'); }catch(e){}
+  const loggedOutView = document.getElementById('accountLoggedOutView');
+  const loggedInView = document.getElementById('accountLoggedInView');
+  if(name){
+    loggedOutView.style.display = 'none';
+    loggedInView.style.display = 'block';
+    document.getElementById('profileNameText').textContent = name;
+    const pic = getProfilePic();
+    const img = document.getElementById('profileAvatarImg');
+    const placeholder = document.getElementById('profileAvatarPlaceholder');
+    if(pic){
+      img.src = pic; img.style.display = 'block'; placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none'; placeholder.style.display = 'block';
+    }
+  } else {
+    loggedOutView.style.display = 'block';
+    loggedInView.style.display = 'none';
+  }
+  refreshHeaderAccountIcon();
+}
+
+document.getElementById('accountBtn').addEventListener('click', ()=>{
+  refreshAccountPanel();
+  accountOverlay.classList.add('open');
+});
+accountOverlay.addEventListener('click', (e)=>{ if(e.target === accountOverlay) accountOverlay.classList.remove('open'); });
+document.getElementById('closeAccountBtn').addEventListener('click', ()=> accountOverlay.classList.remove('open'));
+document.getElementById('accPanelLoginBtn').addEventListener('click', ()=>{
+  accountOverlay.classList.remove('open');
+  openLoginModal('login');
+});
+document.getElementById('accPanelSignupBtn').addEventListener('click', ()=>{
+  accountOverlay.classList.remove('open');
+  openLoginModal('signup');
+});
+document.getElementById('profileAvatarBtn').addEventListener('click', ()=>{
+  document.getElementById('profilePicInput').click();
+});
+document.getElementById('profilePicInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{ localStorage.setItem('profile_pic', reader.result); }catch(err){}
+    log('Profile picture updated');
+    refreshAccountPanel();
+  };
+  reader.readAsDataURL(file);
+});
+
+const removeConfirmOverlay = document.getElementById('removeConfirmOverlay');
+document.getElementById('cancelRemoveBtn').addEventListener('click', ()=>{
+  pendingRemoveId = null;
+  removeConfirmOverlay.classList.remove('open');
+});
+document.getElementById('confirmRemoveBtn').addEventListener('click', ()=>{
+  if(!pendingRemoveId) return;
+  const d = devices.find(x=>x.id===pendingRemoveId);
+  devices = devices.filter(x=>x.id!==pendingRemoveId);
+  if(d) log(`${d.name} removed`);
+  pendingRemoveId = null;
+  removeConfirmOverlay.classList.remove('open');
+  renderDeviceList();
+  render();
+});
+removeConfirmOverlay.addEventListener('click', (e)=>{ if(e.target === removeConfirmOverlay){ pendingRemoveId=null; removeConfirmOverlay.classList.remove('open'); } });
+
+document.querySelectorAll('[data-pw-toggle]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const input = document.getElementById(btn.dataset.pwToggle);
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.innerHTML = showing
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.61 3.68M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  });
+});
+
+const aboutOverlay = document.getElementById('aboutOverlay');
+document.getElementById('menuAboutBtn').addEventListener('click', ()=>{
+  menuOverlay.classList.remove('open');
+  aboutOverlay.classList.add('open');
+});
+document.getElementById('closeAboutBtn').addEventListener('click', ()=> aboutOverlay.classList.remove('open'));
+aboutOverlay.addEventListener('click', (e)=>{ if(e.target === aboutOverlay) aboutOverlay.classList.remove('open'); });
+document.getElementById('closeModalBtn').addEventListener('click', ()=>{
+  modalOverlay.classList.remove('open');
+});
+modalOverlay.addEventListener('click', (e)=>{
+  if(e.target === modalOverlay) modalOverlay.classList.remove('open');
+});
+document.getElementById('saveIpBtn').addEventListener('click', ()=>{
+  const val = document.getElementById('ipInput').value.trim();
+  const unitVal = document.getElementById('unitSelect').value;
+  try{
+    if(val) localStorage.setItem('esp32_ip', val);
+    else localStorage.removeItem('esp32_ip');
+    localStorage.setItem('power_unit', unitVal);
+  }catch(e){}
+  unitPref = unitVal;
+  log(val ? `ESP32 IP saved: ${val}` : 'ESP32 IP cleared');
+  log(`Display units set to ${unitVal}`);
+  modalOverlay.classList.remove('open');
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed:', err));
+}
+
+let systemOn = false;
+const powerBtn = document.getElementById('powerBtn');
+const wrapEl = document.querySelector('.wrap');
+function applySystemState(){
+  wrapEl.classList.toggle('app-greyed', !systemOn);
+  powerBtn.classList.toggle('power-on', systemOn);
+  powerBtn.title = systemOn ? 'System ON — tap to power off' : 'System OFF — tap to power on';
+}
+powerBtn.addEventListener('click', ()=>{
+  systemOn = !systemOn;
+  log(systemOn ? 'System powered ON' : 'System powered OFF');
+  applySystemState();
+});
+applySystemState();
+refreshUsageDisplay();
+refreshTokenDisplay();
+
+log('simulated ESP32 link established');
+renderDeviceList();
+render();
+setInterval(render, 1200);
+</script>
+</body>
+</html>
