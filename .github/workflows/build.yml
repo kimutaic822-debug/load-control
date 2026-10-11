@@ -1,0 +1,41 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show repo tree
+        run: |
+          echo "========== repo root =========="
+          ls -la
+          echo "========== app/ =========="
+          ls -la app/ 2>&1 || echo "MISSING: app/"
+          echo "========== app/build.gradle.kts =========="
+          cat app/build.gradle.kts 2>&1 || echo "MISSING: app/build.gradle.kts"
+          echo "========== settings.gradle.kts =========="
+          cat settings.gradle.kts 2>&1 || echo "MISSING: settings.gradle.kts"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: List tasks
+        run: gradle tasks --all --no-daemon || true
+
+      - name: Build release
+        run: gradle assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CK-Auto-APK
+          path: app/build/outputs/apk/release/app-release.apk
